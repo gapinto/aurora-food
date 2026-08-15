@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/*
+ * Paleta "Aurora Boreal" (spec seção 8).
+ * Uso pretendido: marca, marketing, landing — NÃO o fluxo real de pedido.
+ * O fluxo de pedido ((cliente)/*) usa tema claro próprio por acessibilidade
+ * (contraste/legibilidade para usuários mais velhos ou com baixa visão) —
+ * ver app/(cliente)/layout.tsx.
+ */
+:root {
+  --aurora-night: #160b2e;
+  --aurora-night-2: #1f1240;
+  --aurora-violet: #5b2a9e;
+  --aurora-glow: #39ff9e;
+  --aurora-magenta: #e24baf;
+  --aurora-ice: #eae6f7;
+  --aurora-mist: #9c8fc2;
+
+  --background: var(--aurora-night);
+  --foreground: var(--aurora-ice);
+}
+
+@theme inline {
+  --color-aurora-night: var(--aurora-night);
+  --color-aurora-night-2: var(--aurora-night-2);
+  --color-aurora-violet: var(--aurora-violet);
+  --color-aurora-glow: var(--aurora-glow);
+  --color-aurora-magenta: var(--aurora-magenta);
+  --color-aurora-ice: var(--aurora-ice);
+  --color-aurora-mist: var(--aurora-mist);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/*
+ * Tema claro do fluxo de pedido: fundo claro, texto escuro, fonte grande.
+ * Legibilidade > identidade visual nessa camada (spec seção 8).
+ */
+.fluxo-pedido {
+  --background: #ffffff;
+  --foreground: #1a1523;
+  font-size: 1.0625rem;
+}
+
+.fluxo-pedido button {
+  font-size: inherit;
+}
