@@ -37,7 +37,6 @@ export default defineConfig({
         "app/api/agente/route.ts",
         "app/api/import-cardapio/route.ts",
         "app/api/onboarding/route.ts",
-        "app/api/webhooks/asaas/route.ts",
       ],
       thresholds: {
         lines: 80,

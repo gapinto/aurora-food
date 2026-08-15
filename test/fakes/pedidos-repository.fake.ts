@@ -1,4 +1,5 @@
 import type {
+  ItemDisponivel,
   LinhaPedidoInput,
   LojaResumoPagamento,
   NovoPedidoInput,
@@ -17,6 +18,10 @@ interface PedidoArmazenado extends NovoPedidoInput {
 // casos de uso em lib/pedidos/*.test.ts pra não depender de rede/Supabase.
 export function criarPedidosRepositoryFake(options?: {
   lojas?: Record<string, LojaResumoPagamento>;
+  // Catálogo real de itens por loja — é daqui que criarPedido resolve o
+  // preço, nunca do payload do cliente (ver criar-pedido.test.ts, casos de
+  // "price tampering").
+  itensPorLoja?: Record<string, ItemDisponivel[]>;
   falharAoCriarPedido?: boolean;
   falharAoCriarItens?: boolean;
 }) {
@@ -37,6 +42,11 @@ export function criarPedidosRepositoryFake(options?: {
       if (!pedido) return false;
       pedido.itens = linhas;
       return true;
+    },
+
+    async buscarItensDisponiveis(lojaId: string, itemIds: string[]): Promise<ItemDisponivel[]> {
+      const catalogo = options?.itensPorLoja?.[lojaId] ?? [];
+      return catalogo.filter((item) => itemIds.includes(item.id));
     },
 
     async buscarLojaParaPagamento(lojaId: string): Promise<LojaResumoPagamento | null> {

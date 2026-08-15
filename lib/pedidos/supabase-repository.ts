@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
 import type {
+  ItemDisponivel,
   LinhaPedidoInput,
   LojaResumoPagamento,
   NovoPedidoInput,
@@ -38,6 +39,18 @@ export const supabasePedidosRepository: PedidosRepository = {
       })),
     );
     return !error;
+  },
+
+  async buscarItensDisponiveis(lojaId: string, itemIds: string[]): Promise<ItemDisponivel[]> {
+    const supabase = createServiceRoleClient();
+    const { data } = await supabase
+      .from("itens")
+      .select("id, preco")
+      .eq("loja_id", lojaId)
+      .eq("disponivel", true)
+      .in("id", itemIds);
+
+    return data ?? [];
   },
 
   async buscarLojaParaPagamento(lojaId: string): Promise<LojaResumoPagamento | null> {

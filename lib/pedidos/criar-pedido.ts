@@ -4,9 +4,18 @@ import type { FormaPagamento } from "@/lib/types/database";
 import { calcularValorTotal, gerarSenha as gerarSenhaPadrao } from "./calculos";
 import type { LinhaPedidoInput, PedidosRepository } from "./repository";
 
+// Só itemId e quantidade vêm do cliente — o preço é sempre resolvido no
+// servidor a partir do cardápio real (ver buscarItensDisponiveis). Aceitar
+// `preco` do payload permitiria o cliente montar o próprio valor do pedido
+// (price tampering — achado da revisão OWASP, CLAUDE.md/Backlog).
+export interface LinhaPedidoRequisitada {
+  itemId: string;
+  quantidade: number;
+}
+
 export interface CriarPedidoInput {
   lojaId: string;
-  linhas: LinhaPedidoInput[];
+  linhas: LinhaPedidoRequisitada[];
   formaPagamento: FormaPagamento;
 }
 
@@ -32,7 +41,16 @@ export async function criarPedido(
     return { ok: false, erro: "payload inválido" };
   }
 
-  const valorTotal = calcularValorTotal(input.linhas);
+  if (input.linhas.some((linha) => !Number.isInteger(linha.quantidade) || linha.quantidade <= 0)) {
+    return { ok: false, erro: "quantidade inválida" };
+  }
+
+  const linhasComPrecoReal = await resolverPrecosReais(input.lojaId, input.linhas, deps.repositorio);
+  if (!linhasComPrecoReal.ok) {
+    return linhasComPrecoReal;
+  }
+
+  const valorTotal = calcularValorTotal(linhasComPrecoReal.linhas);
   const senha = (deps.gerarSenha ?? gerarSenhaPadrao)();
 
   const pedido = await deps.repositorio.criarPedido({
@@ -46,7 +64,7 @@ export async function criarPedido(
     return { ok: false, erro: "não foi possível criar o pedido" };
   }
 
-  const itensCriados = await deps.repositorio.criarItensPedido(pedido.id, input.linhas);
+  const itensCriados = await deps.repositorio.criarItensPedido(pedido.id, linhasComPrecoReal.linhas);
   if (!itensCriados) {
     return { ok: false, erro: "não foi possível registrar os itens" };
   }
@@ -56,6 +74,29 @@ export async function criarPedido(
   }
 
   return { ok: true, pedidoId: pedido.id, senha: pedido.senha };
+}
+
+async function resolverPrecosReais(
+  lojaId: string,
+  linhas: LinhaPedidoRequisitada[],
+  repositorio: PedidosRepository,
+): Promise<{ ok: true; linhas: LinhaPedidoInput[] } | { ok: false; erro: string }> {
+  const itensDisponiveis = await repositorio.buscarItensDisponiveis(
+    lojaId,
+    linhas.map((linha) => linha.itemId),
+  );
+  const precoPorItem = new Map(itensDisponiveis.map((item) => [item.id, item.preco]));
+
+  const linhasComPrecoReal: LinhaPedidoInput[] = [];
+  for (const linha of linhas) {
+    const preco = precoPorItem.get(linha.itemId);
+    if (preco === undefined) {
+      return { ok: false, erro: `item ${linha.itemId} indisponível` };
+    }
+    linhasComPrecoReal.push({ itemId: linha.itemId, preco, quantidade: linha.quantidade });
+  }
+
+  return { ok: true, linhas: linhasComPrecoReal };
 }
 
 async function tentarCriarCobrancaPix(

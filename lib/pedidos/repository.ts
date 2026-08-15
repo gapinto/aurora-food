@@ -24,6 +24,11 @@ export interface LojaResumoPagamento {
   comissaoPercentual: number;
 }
 
+export interface ItemDisponivel {
+  id: string;
+  preco: number;
+}
+
 // Programado contra interface: os casos de uso em lib/pedidos/*.ts (a
 // lógica de negócio testada em TDD) nunca falam com o Supabase direto —
 // só com este contrato. Em teste, um fake em memória implementa a mesma
@@ -32,6 +37,9 @@ export interface LojaResumoPagamento {
 export interface PedidosRepository {
   criarPedido(input: NovoPedidoInput): Promise<PedidoCriado | null>;
   criarItensPedido(pedidoId: string, linhas: LinhaPedidoInput[]): Promise<boolean>;
+  // Preço vem sempre daqui, nunca do client — ver achado de segurança
+  // "price tampering" na revisão OWASP (CLAUDE.md, seção Backlog).
+  buscarItensDisponiveis(lojaId: string, itemIds: string[]): Promise<ItemDisponivel[]>;
   buscarLojaParaPagamento(lojaId: string): Promise<LojaResumoPagamento | null>;
   atualizarChargeId(pedidoId: string, chargeId: string): Promise<void>;
   buscarStatusAtual(pedidoId: string): Promise<StatusPedido | null>;

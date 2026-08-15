@@ -213,14 +213,47 @@ definitivo ao implementar cobrança.
 ## Backlog
 
 - **Revisão de segurança OWASP Top 10** — antes de sair do MVP pra produção
-  com dinheiro de verdade fluindo (Pix, split, subconta do lojista). Pontos
-  de atenção já identificados neste harness, por categoria OWASP:
-  - **A01 Broken Access Control:** rotas de painel (`app/(painel)/cozinha`,
-    `app/(painel)/caixa`) e os endpoints `PATCH /api/pedidos/[pedidoId]/status`
-    não têm autenticação/autorização por loja — qualquer um com a URL avança
-    status de pedido de qualquer loja. Falta também RLS além do `select`
-    público em `supabase/migrations/0001_init.sql` (insert/update ainda
-    dependem só da service role usada pelas rotas).
+  com dinheiro de verdade fluindo (Pix, split, subconta do lojista). A skill
+  `security-review` não roda no ambiente deste harness (precisa de cwd fixo
+  em raiz de repo git, que este runner não garante entre chamadas) — a
+  revisão abaixo foi feita manualmente lendo o código, seguindo a mesma
+  estrutura. Reavaliar com a skill quando o ambiente permitir.
+
+  **Já corrigido nesta revisão:**
+  - **A01/A04 — price tampering em `POST /api/pedidos`:** o payload aceitava
+    `preco` vindo direto do client, sem validar contra o cardápio real —
+    dava pra criar pedido com qualquer valor. Corrigido em
+    `lib/pedidos/criar-pedido.ts`: o caso de uso agora só aceita
+    `{itemId, quantidade}` do client e resolve o preço real via
+    `PedidosRepository.buscarItensDisponiveis(lojaId, itemIds)`, que também
+    valida que o item pertence à loja e está disponível. Teste de regressão
+    em `criar-pedido.test.ts` ("ignora qualquer 'preco' enviado no
+    payload").
+  - **A01/A04 — webhook do Asaas fail-open:** se `ASAAS_WEBHOOK_TOKEN` não
+    estivesse configurada, `app/api/webhooks/asaas/route.ts` pulava a
+    checagem inteira e aceitava qualquer POST como pagamento confirmado.
+    Corrigido pra fail closed (500 sem token configurada, 401 sem bater) +
+    comparação em tempo constante (`timingSafeEqual`). Teste em
+    `route.test.ts`.
+
+  **Ainda aberto — o mais crítico do que sobra:**
+  - **A01/A07 Broken Access Control / Authentication:** `PATCH
+    /api/pedidos/[pedidoId]/status` e as rotas de painel
+    (`app/(painel)/cozinha`, `app/(painel)/caixa`) não têm nenhuma
+    autenticação. Isso é explorável de forma direta: o `pedidoId` fica na
+    URL que o próprio cliente recebe depois do checkout
+    (`/[loja]/pedido/[pedidoId]`), então um cliente mal-intencionado pode
+    chamar `PATCH` nesse endpoint direto do DevTools e avançar o próprio
+    pedido pra `pago` (inclusive o de "pagar no caixa", sem pagar nada) —
+    a máquina de estados em `lib/pedidos/status.ts` impede pular etapa, mas
+    não impede quem aciona. Corrigir exige decidir o mecanismo de auth pro
+    dono da loja / operador de caixa-cozinha (Supabase Auth é o candidato
+    natural, já que o resto do stack já é Supabase) — é uma decisão de
+    arquitetura, não um bug pontual, por isso não foi resolvida junto dos
+    dois itens acima. Falta também RLS de verdade em `insert`/`update` nas
+    migrations (hoje só o `select` de itens/pedidos é público; escrita
+    depende inteiramente da service role usada pelas rotas, então travar a
+    rota é obrigatório, RLS sozinho não resolve).
   - **A02 Cryptographic Failures:** conferir que `SUPABASE_SERVICE_ROLE_KEY`,
     `ASAAS_API_KEY` e o certificado A1 do lojista nunca chegam ao client
     (hoje só usados em `lib/*/supabase-repository.ts` e `lib/asaas/client.ts`,
@@ -229,24 +262,17 @@ definitivo ao implementar cobrança.
     mas o scraper de import de cardápio (`app/api/import-cardapio`, ainda
     não implementado) vai processar HTML de terceiro — tratar como entrada
     não confiável quando for implementado.
-  - **A04 Insecure Design:** `app/api/webhooks/asaas/route.ts` já checa um
-    token compartilhado (`ASAAS_WEBHOOK_TOKEN`), mas falta validar a
-    assinatura oficial do Asaas quando a rota for implementada de verdade
-    contra o sandbox; hoje o TODO no arquivo é só estrutural.
+  - **A04 Insecure Design (resto):** o webhook valida só o token
+    compartilhado, ainda falta validar a assinatura oficial do Asaas quando
+    a integração for implementada de verdade contra o sandbox.
   - **A05 Security Misconfiguration:** revisar headers de segurança do Next
     (CSP, HSTS) antes do deploy Vercel — nada configurado ainda.
-  - **A07 Identification and Authentication Failures:** todo o produto ainda
-    não tem conceito de login pro dono da loja / operador de caixa-cozinha —
-    é pré-requisito pra fechar A01 acima.
-  - **A08 Software and Data Integrity Failures:** `app/api/pedidos/[pedidoId]/status/route.ts`
-    já valida transição via `lib/pedidos/status.ts`, mas sem auth (A01) isso
-    só impede pular etapa, não impede quem pode acionar.
+  - **A08 Software and Data Integrity Failures:** coberto pela máquina de
+    estados (`lib/pedidos/status.ts`), mas depende de A01 ser resolvido pra
+    valer alguma coisa (ver acima).
   - **A09 Security Logging and Monitoring Failures:** nenhum log estruturado
     de eventos sensíveis (confirmação de pagamento, mudança de status,
     onboarding) — avaliar antes de produção.
-  - Rodar a skill `security-review` sobre o diff acumulado quando essa
-    revisão entrar em execução, e priorizar A01/A07 (autenticação e
-    autorização) por serem os únicos que hoje têm exploração trivial.
 
 ## Estado atual do harness
 
@@ -255,11 +281,11 @@ integrações Supabase/Asaas como stubs tipados, schema completo em
 migrations, todas as telas da Fase 1 com estrutura e UX corretas mas dados
 de exemplo/mocks onde não há projeto Supabase real conectado ainda.
 
-Testes: Vitest + Testing Library, ~70 testes cobrindo os casos de uso de
+Testes: Vitest + Testing Library, ~80 testes cobrindo os casos de uso de
 pedidos/onboarding (via fakes das interfaces), os cálculos de carrinho, a
 máquina de estados de status, os componentes de cardápio/painéis/
-acompanhamento de pedido, e os dois adapters HTTP mais centrais
-(`app/api/pedidos/route.ts`, `.../status/route.ts`). Rodar com `npm test`
+acompanhamento de pedido, e três adapters HTTP (`app/api/pedidos/route.ts`,
+`.../status/route.ts`, `.../webhooks/asaas/route.ts`). Rodar com `npm test`
 ou `npm run test:coverage`. Ver seção "Práticas de engenharia" acima antes
 de adicionar código novo.
 

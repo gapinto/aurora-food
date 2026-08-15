@@ -43,10 +43,14 @@ export default function CheckoutPage() {
     setEnviando(true);
     setErro(null);
     try {
+      // Só itemId + quantidade — o preço é sempre resolvido no servidor a
+      // partir do cardápio real, nunca confiado do client (ver
+      // lib/pedidos/criar-pedido.ts).
+      const linhas = carrinho!.linhas.map(({ itemId, quantidade }) => ({ itemId, quantidade }));
       const response = await fetch("/api/pedidos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lojaId: params.loja, linhas: carrinho!.linhas, formaPagamento }),
+        body: JSON.stringify({ lojaId: params.loja, linhas, formaPagamento }),
       });
       if (!response.ok) throw new Error(await response.text());
       const { pedidoId } = await response.json();
