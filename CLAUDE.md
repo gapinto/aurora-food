@@ -46,6 +46,11 @@ Serverless, não VPS/Terraform — alinhado com operação enxuta.
 `[loja]` nas rotas é o `id` (uuid) da loja — o QR code do balcão aponta
 direto pra URL, sem slug/busca.
 
+Diagramas de fluxo (pedido Pix online, pedido pago no caixa, mapa de
+dependências) ficam em `docs/diagramas/` — YAML como fonte de verdade,
+`.excalidraw` sempre gerado, nunca editado à mão. Ver
+`docs/diagramas/README.md` pra regenerar depois de mudar o fluxo.
+
 ## Pagamento (Asaas)
 
 - Cada restaurante tem subconta Asaas própria (`lojas.asaas_wallet_id`),

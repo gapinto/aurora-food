@@ -1,0 +1,24 @@
+pattern: service-dependency-map
+title: "Aurora Food — arquitetura (serverless)"
+
+service: Aurora Food (Next.js)
+
+inbound:
+  - verb: POST
+    path: /api/pedidos
+  - verb: PATCH
+    path: /api/pedidos/{pedidoId}/status
+  - verb: POST
+    path: /api/webhooks/asaas
+  - verb: POST
+    path: /api/onboarding
+
+depends_on_sync:
+  - name: Supabase (Postgres + Realtime)
+    type: database
+  - name: Asaas (Pix, split, subconta)
+    type: service
+
+output:
+  target: standalone
+  path: docs/diagramas/out/arquitetura.excalidraw

@@ -1,0 +1,41 @@
+pattern: swimlane
+title: "Aurora Food — pedido pago via Pix online"
+
+actors:
+  - Cliente
+  - App Aurora Food
+  - Asaas
+  - Cozinha
+
+steps:
+  - from: Cliente
+    to: App Aurora Food
+    msg: escaneia QR do balcão e monta o pedido
+
+  - from: Cliente
+    to: App Aurora Food
+    msg: escolhe "Pix agora"
+
+  - from: App Aurora Food
+    to: Asaas
+    msg: cria cobrança Pix (com split de comissão)
+
+  - from: Cliente
+    to: Asaas
+    msg: paga o Pix
+
+  - from: Asaas
+    to: App Aurora Food
+    msg: webhook PAYMENT_RECEIVED
+
+  - from: App Aurora Food
+    to: Cozinha
+    msg: libera pedido — cozinha começa a preparar
+
+  - from: Cliente
+    to: Cozinha
+    msg: retira o pedido com a senha, quando pronto
+
+output:
+  target: standalone
+  path: docs/diagramas/out/pedido-pix-online.excalidraw

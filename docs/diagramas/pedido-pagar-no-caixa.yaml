@@ -1,0 +1,41 @@
+pattern: swimlane
+title: "Aurora Food — pedido pago no caixa"
+
+actors:
+  - Cliente
+  - App Aurora Food
+  - Caixa
+  - Cozinha
+
+steps:
+  - from: Cliente
+    to: App Aurora Food
+    msg: escaneia QR do balcão e monta o pedido
+
+  - from: Cliente
+    to: App Aurora Food
+    msg: escolhe "pagar no caixa"
+
+  - from: App Aurora Food
+    to: Cliente
+    msg: gera senha, aguardando pagamento
+
+  - from: Cliente
+    to: Caixa
+    msg: paga (dinheiro, cartão, Pix manual ou VR/VA)
+
+  - from: Caixa
+    to: App Aurora Food
+    msg: confirma pagamento manualmente
+
+  - from: App Aurora Food
+    to: Cozinha
+    msg: libera pedido — cozinha começa a preparar
+
+  - from: Cliente
+    to: Cozinha
+    msg: retira o pedido com a senha, quando pronto
+
+output:
+  target: standalone
+  path: docs/diagramas/out/pedido-pagar-no-caixa.excalidraw
