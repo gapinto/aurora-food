@@ -210,6 +210,44 @@ definitivo ao implementar cobrança.
 - **Fase 5 (exploratório):** fila-zero preditiva, praça de alimentação
   unificada, agente autônomo de operação, preço dinâmico.
 
+## Backlog
+
+- **Revisão de segurança OWASP Top 10** — antes de sair do MVP pra produção
+  com dinheiro de verdade fluindo (Pix, split, subconta do lojista). Pontos
+  de atenção já identificados neste harness, por categoria OWASP:
+  - **A01 Broken Access Control:** rotas de painel (`app/(painel)/cozinha`,
+    `app/(painel)/caixa`) e os endpoints `PATCH /api/pedidos/[pedidoId]/status`
+    não têm autenticação/autorização por loja — qualquer um com a URL avança
+    status de pedido de qualquer loja. Falta também RLS além do `select`
+    público em `supabase/migrations/0001_init.sql` (insert/update ainda
+    dependem só da service role usada pelas rotas).
+  - **A02 Cryptographic Failures:** conferir que `SUPABASE_SERVICE_ROLE_KEY`,
+    `ASAAS_API_KEY` e o certificado A1 do lojista nunca chegam ao client
+    (hoje só usados em `lib/*/supabase-repository.ts` e `lib/asaas/client.ts`,
+    que rodam server-side — validar que segue assim conforme o código cresce).
+  - **A03 Injection:** baixo risco hoje (Supabase client parametriza queries),
+    mas o scraper de import de cardápio (`app/api/import-cardapio`, ainda
+    não implementado) vai processar HTML de terceiro — tratar como entrada
+    não confiável quando for implementado.
+  - **A04 Insecure Design:** `app/api/webhooks/asaas/route.ts` já checa um
+    token compartilhado (`ASAAS_WEBHOOK_TOKEN`), mas falta validar a
+    assinatura oficial do Asaas quando a rota for implementada de verdade
+    contra o sandbox; hoje o TODO no arquivo é só estrutural.
+  - **A05 Security Misconfiguration:** revisar headers de segurança do Next
+    (CSP, HSTS) antes do deploy Vercel — nada configurado ainda.
+  - **A07 Identification and Authentication Failures:** todo o produto ainda
+    não tem conceito de login pro dono da loja / operador de caixa-cozinha —
+    é pré-requisito pra fechar A01 acima.
+  - **A08 Software and Data Integrity Failures:** `app/api/pedidos/[pedidoId]/status/route.ts`
+    já valida transição via `lib/pedidos/status.ts`, mas sem auth (A01) isso
+    só impede pular etapa, não impede quem pode acionar.
+  - **A09 Security Logging and Monitoring Failures:** nenhum log estruturado
+    de eventos sensíveis (confirmação de pagamento, mudança de status,
+    onboarding) — avaliar antes de produção.
+  - Rodar a skill `security-review` sobre o diff acumulado quando essa
+    revisão entrar em execução, e priorizar A01/A07 (autenticação e
+    autorização) por serem os únicos que hoje têm exploração trivial.
+
 ## Estado atual do harness
 
 Scaffold inicial: Next.js 16 (App Router) + Tailwind 4 + TypeScript,
