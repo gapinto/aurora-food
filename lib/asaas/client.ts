@@ -1,9 +1,16 @@
+import type {
+  CriarCobrancaPixInput,
+  CriarCobrancaPixResultado,
+  CriarSubcontaInput,
+  CriarSubcontaResultado,
+  PagamentoProvider,
+} from "./types";
+
 // Wrapper fino sobre a API do Asaas. Cada loja tem sua própria subconta
 // (wallet); o split de comissão da Aurora é aplicado na cobrança, e o
 // dinheiro cai direto na subconta do lojista (ver spec seção 3).
 //
-// TODO Fase 1: implementar as chamadas reais (fetch para api.asaas.com/v3).
-// Por ora expõe apenas os contratos usados pelo resto do app.
+// TODO Fase 1: validar as chamadas reais contra o sandbox do Asaas.
 
 const ASAAS_BASE_URL =
   process.env.ASAAS_ENV === "production"
@@ -37,38 +44,11 @@ async function asaasRequest<T>(path: string, options: AsaasRequestOptions = {}):
   return response.json() as Promise<T>;
 }
 
-export interface CriarSubcontaInput {
-  nome: string;
-  cnpj: string;
-  email: string;
-}
-
-export interface CriarSubcontaResultado {
-  walletId: string;
-  apiKey: string;
-}
-
-export function criarSubconta(input: CriarSubcontaInput): Promise<CriarSubcontaResultado> {
+function criarSubconta(input: CriarSubcontaInput): Promise<CriarSubcontaResultado> {
   return asaasRequest("/accounts", { method: "POST", body: input });
 }
 
-export interface CriarCobrancaPixInput {
-  walletId: string;
-  valor: number;
-  comissaoPercentual: number;
-  descricao: string;
-  pedidoId: string;
-}
-
-export interface CriarCobrancaPixResultado {
-  chargeId: string;
-  qrCodePayload: string;
-  qrCodeImageBase64: string;
-}
-
-export function criarCobrancaPix(
-  input: CriarCobrancaPixInput,
-): Promise<CriarCobrancaPixResultado> {
+function criarCobrancaPix(input: CriarCobrancaPixInput): Promise<CriarCobrancaPixResultado> {
   return asaasRequest("/pix/qrCodes", {
     method: "POST",
     body: {
@@ -80,3 +60,10 @@ export function criarCobrancaPix(
     },
   });
 }
+
+export const asaasPagamentoProvider: PagamentoProvider = {
+  criarSubconta,
+  criarCobrancaPix,
+};
+
+export type { PagamentoProvider } from "./types";

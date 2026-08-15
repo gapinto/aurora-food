@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { calcularTotalCarrinho, contarItensCarrinho } from "@/lib/carrinho/calculos";
 import { salvarCarrinho, type CartLine } from "@/lib/types/cart";
 import type { Item } from "@/lib/types/database";
 
@@ -34,8 +35,8 @@ export function CardapioClient({ lojaSlug, itens }: { lojaSlug: string; itens: I
       quantidade: quantidades[item.id],
     }));
 
-  const total = linhas.reduce((soma, linha) => soma + linha.preco * linha.quantidade, 0);
-  const totalItens = linhas.reduce((soma, linha) => soma + linha.quantidade, 0);
+  const total = calcularTotalCarrinho(linhas);
+  const totalItens = contarItensCarrinho(linhas);
 
   function ajustar(itemId: string, delta: number) {
     setQuantidades((atual) => {

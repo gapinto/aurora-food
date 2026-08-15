@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
+import { calcularTotalCarrinho } from "@/lib/carrinho/calculos";
 import { lerCarrinho } from "@/lib/types/cart";
 import type { FormaPagamento } from "@/lib/types/database";
 
@@ -36,7 +37,7 @@ export default function CheckoutPage() {
 
   if (!carrinho || carrinho.linhas.length === 0) return null;
 
-  const total = carrinho.linhas.reduce((soma, linha) => soma + linha.preco * linha.quantidade, 0);
+  const total = calcularTotalCarrinho(carrinho.linhas);
 
   async function finalizarPedido() {
     setEnviando(true);

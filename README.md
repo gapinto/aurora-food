@@ -23,12 +23,29 @@ Aplicar o schema no projeto Supabase:
 supabase db push  # ou rodar supabase/migrations/0001_init.sql manualmente
 ```
 
+## Testes
+
+```bash
+npm test              # roda a suíte uma vez
+npm run test:watch    # modo watch
+npm run test:coverage # com relatório de cobertura (thresholds em vitest.config.mts)
+```
+
+Lógica de negócio (`lib/**/criar-pedido.ts`, `atualizar-status.ts`,
+`onboarding.ts` etc.) é testada com fakes em memória das interfaces
+(`test/fakes/`), sem tocar Supabase/Asaas de verdade. Ver "Práticas de
+engenharia" em `CLAUDE.md` antes de adicionar código novo — o padrão é
+sempre caso de uso + interface + teste com fake, TDD.
+
 ## Estrutura
 
 - `app/(cliente)/[loja]/**` — cardápio, checkout e acompanhamento do pedido (tema claro).
 - `app/(painel)/{cozinha,caixa}/[loja]/**` — painéis internos em tempo real.
-- `app/api/**` — webhook Asaas, criação de pedidos, onboarding, import de cardápio, agente de IA.
-- `lib/supabase/`, `lib/asaas/`, `lib/agente/` — integrações.
+- `app/api/**` — adapters HTTP finos: parseiam a request, injetam as implementações reais e chamam o caso de uso correspondente.
+- `lib/pedidos/`, `lib/lojas/` — casos de uso (lógica de negócio pura) + interfaces de repositório + implementações Supabase.
+- `lib/asaas/` — interface `PagamentoProvider` + implementação real via fetch.
+- `lib/carrinho/`, `lib/supabase/`, `lib/agente/` — cálculos compartilhados e outras integrações.
+- `test/fakes/` — implementações em memória das interfaces, usadas nos testes dos casos de uso.
 - `supabase/migrations/` — schema (fonte de verdade); `lib/types/database.ts` é o espelho TypeScript.
 
 ## Deploy

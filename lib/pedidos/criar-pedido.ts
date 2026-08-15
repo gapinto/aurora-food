@@ -1,0 +1,83 @@
+import type { PagamentoProvider } from "@/lib/asaas/types";
+import type { FormaPagamento } from "@/lib/types/database";
+
+import { calcularValorTotal, gerarSenha as gerarSenhaPadrao } from "./calculos";
+import type { LinhaPedidoInput, PedidosRepository } from "./repository";
+
+export interface CriarPedidoInput {
+  lojaId: string;
+  linhas: LinhaPedidoInput[];
+  formaPagamento: FormaPagamento;
+}
+
+export interface CriarPedidoDeps {
+  repositorio: PedidosRepository;
+  pagamento: PagamentoProvider;
+  gerarSenha?: () => string;
+}
+
+export type CriarPedidoResultado =
+  | { ok: true; pedidoId: string; senha: string }
+  | { ok: false; erro: string };
+
+// Caso de uso puro: recebe as dependências como interfaces (PedidosRepository,
+// PagamentoProvider), nunca importa Supabase/Asaas concretos — é isso que
+// deixa testável sem rede/DB (ver criar-pedido.test.ts) e é o adapter em
+// app/api/pedidos/route.ts que decide as implementações reais.
+export async function criarPedido(
+  input: CriarPedidoInput,
+  deps: CriarPedidoDeps,
+): Promise<CriarPedidoResultado> {
+  if (!input.lojaId || !input.linhas?.length || !input.formaPagamento) {
+    return { ok: false, erro: "payload inválido" };
+  }
+
+  const valorTotal = calcularValorTotal(input.linhas);
+  const senha = (deps.gerarSenha ?? gerarSenhaPadrao)();
+
+  const pedido = await deps.repositorio.criarPedido({
+    lojaId: input.lojaId,
+    valorTotal,
+    formaPagamento: input.formaPagamento,
+    status: input.formaPagamento === "pix_online" ? "aguardando_pagamento_pix" : "aguardando_pagamento_caixa",
+    senha,
+  });
+  if (!pedido) {
+    return { ok: false, erro: "não foi possível criar o pedido" };
+  }
+
+  const itensCriados = await deps.repositorio.criarItensPedido(pedido.id, input.linhas);
+  if (!itensCriados) {
+    return { ok: false, erro: "não foi possível registrar os itens" };
+  }
+
+  if (input.formaPagamento === "pix_online") {
+    await tentarCriarCobrancaPix(pedido, valorTotal, input.lojaId, deps);
+  }
+
+  return { ok: true, pedidoId: pedido.id, senha: pedido.senha };
+}
+
+async function tentarCriarCobrancaPix(
+  pedido: { id: string; senha: string },
+  valorTotal: number,
+  lojaId: string,
+  deps: CriarPedidoDeps,
+): Promise<void> {
+  const loja = await deps.repositorio.buscarLojaParaPagamento(lojaId);
+  if (!loja?.asaasWalletId) return;
+
+  try {
+    const cobranca = await deps.pagamento.criarCobrancaPix({
+      walletId: loja.asaasWalletId,
+      valor: valorTotal,
+      comissaoPercentual: loja.comissaoPercentual,
+      descricao: `Pedido Aurora Food #${pedido.senha}`,
+      pedidoId: pedido.id,
+    });
+    await deps.repositorio.atualizarChargeId(pedido.id, cobranca.chargeId);
+  } catch {
+    // Loja ainda sem subconta Asaas configurada (onboarding incompleto) —
+    // o pedido continua criado, mas sem cobrança Pix gerada.
+  }
+}

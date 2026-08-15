@@ -96,8 +96,8 @@ confiança abaixo), `pedidos`, `pedido_itens`, `eventos_funil`.
 
 Status do pedido: `aguardando_pagamento_pix | aguardando_pagamento_caixa |
 pago | preparando | pronto | retirado`. Transições válidas estão
-centralizadas em `app/api/pedidos/[pedidoId]/status/route.ts` — não avançar
-status fora dessa máquina de estados.
+centralizadas em `lib/pedidos/status.ts` (`transicaoValida`) — não avançar
+status fora dessa máquina de estados nem duplicar a tabela em outro lugar.
 
 ## Confiança e transparência
 
@@ -118,6 +118,68 @@ classe `.fluxo-pedido` (fundo claro, texto escuro, fonte maior) definida no
 mesmo arquivo — legibilidade prioriza sobre identidade visual nessa camada.
 Qualquer nova tela de pedido do cliente deve herdar esse layout, não o tema
 escuro.
+
+## Práticas de engenharia (convenção permanente — sempre seguir)
+
+Instrução permanente do fundador: clean code, TDD e boa cobertura de teste,
+programando contra interfaces. Vale para todo código novo neste repo, não só
+para o que já existe.
+
+**Programar para interface, não para implementação concreta.** Lógica de
+negócio nunca importa Supabase/Asaas direto — depende de uma interface
+TypeScript, e quem decide a implementação real é a borda mais fina possível
+(a rota de API). Padrão do repo:
+
+- `lib/<domínio>/repository.ts` — interface de acesso a dados (ex.:
+  `PedidosRepository`, `LojasRepository`).
+- `lib/<domínio>/supabase-repository.ts` — implementação real, só chamada
+  pela rota de API.
+- `lib/asaas/types.ts` — interface `PagamentoProvider`; `lib/asaas/client.ts`
+  implementa e exporta `asaasPagamentoProvider`.
+- `lib/<domínio>/<caso-de-uso>.ts` — função pura de caso de uso, recebe as
+  dependências (repositório, provider) por parâmetro (`deps`), nunca as
+  importa direto. Ex.: `criarPedido`, `atualizarStatusPedido`,
+  `iniciarOnboarding`.
+- `app/api/**/route.ts` — adapter fino: parseia `Request`, injeta as
+  implementações reais, chama o caso de uso, mapeia o resultado pra
+  `NextResponse`. Não deve conter lógica de negócio.
+
+Exemplo de referência completo: `lib/pedidos/criar-pedido.ts` +
+`lib/pedidos/repository.ts` + `lib/pedidos/supabase-repository.ts` +
+`app/api/pedidos/route.ts`.
+
+**TDD.** Escrever o teste do caso de uso (ou da função pura) antes ou junto
+da implementação, usando fakes em memória das interfaces — não mocks de
+framework, não uma instância real de Supabase. Fakes reutilizáveis ficam em
+`test/fakes/*.fake.ts` (`criarPedidosRepositoryFake`,
+`criarPagamentoProviderFake`, `criarLojasRepositoryFake`); crie um fake novo
+lá quando surgir uma interface nova, em vez de mockar o módulo inteiro
+inline em cada teste.
+
+**Cobertura.** `npm run test:coverage` roda com `vitest.config.mts` —
+thresholds de 80% linhas/statements/functions, 75% branches. O `include` do
+coverage cobre `lib/**` e `app/**`, mas o `exclude` tira do gate os
+adaptadores finos de I/O que não carregam lógica própria: implementações
+`*-supabase-repository.ts`, `lib/asaas/client.ts`, `lib/supabase/client.ts` e
+`server.ts`, `app/**/page.tsx`, `app/**/layout.tsx`, e as rotas que ainda
+não foram migradas pro padrão caso-de-uso+interface (`app/api/agente`,
+`app/api/import-cardapio`, `app/api/onboarding`, `app/api/webhooks/asaas`).
+Ao migrar uma dessas rotas pro padrão (extrair caso de uso testável), tire a
+exclusão dela do `vitest.config.mts` e escreva os testes correspondentes —
+não deixe a exclusão como padrão permanente pra rota nova.
+
+Componentes React com lógica real (não só markup) — interação de carrinho,
+assinatura Realtime, cálculo — têm teste com Testing Library
+(`@testing-library/react` + `@testing-library/user-event`). `page.tsx` e
+`layout.tsx` (Server Components com `params` assíncrono, sem lógica própria
+além de buscar dados e delegar pro componente client) ficam fora do gate,
+mas ganham cobertura indireta pelo teste do componente client que renderizam.
+
+**Clean code.** Funções pequenas e com um motivo pra existir; nomes em
+português consistentes com o resto do domínio (`criarPedido`, não
+`createOrder`); sem duplicação — cálculo de total/contagem de carrinho vive
+uma vez em `lib/carrinho/calculos.ts` e é reusado tanto no cardápio quanto
+no checkout, não recalculado inline em cada componente.
 
 ## Modelo de negócio
 
@@ -153,8 +215,19 @@ definitivo ao implementar cobrança.
 Scaffold inicial: Next.js 16 (App Router) + Tailwind 4 + TypeScript,
 integrações Supabase/Asaas como stubs tipados, schema completo em
 migrations, todas as telas da Fase 1 com estrutura e UX corretas mas dados
-de exemplo/mocks onde não há projeto Supabase real conectado ainda. Não há
-testes automatizados. Próximos passos naturais: provisionar o projeto
-Supabase real e rodar a migration, criar conta Asaas sandbox e preencher
-`.env.example`, substituir os dados de exemplo do cardápio por dados reais
-de uma loja de teste.
+de exemplo/mocks onde não há projeto Supabase real conectado ainda.
+
+Testes: Vitest + Testing Library, ~70 testes cobrindo os casos de uso de
+pedidos/onboarding (via fakes das interfaces), os cálculos de carrinho, a
+máquina de estados de status, os componentes de cardápio/painéis/
+acompanhamento de pedido, e os dois adapters HTTP mais centrais
+(`app/api/pedidos/route.ts`, `.../status/route.ts`). Rodar com `npm test`
+ou `npm run test:coverage`. Ver seção "Práticas de engenharia" acima antes
+de adicionar código novo.
+
+Próximos passos naturais: provisionar o projeto Supabase real e rodar a
+migration, criar conta Asaas sandbox e preencher `.env.local` (a partir de
+`.env.example`), substituir os dados de exemplo do cardápio por dados reais
+de uma loja de teste, e migrar as rotas ainda sem caso de uso extraído
+(agente, import-cardapio, webhook Asaas) pro mesmo padrão de interface —
+ver a lista de exclusões do coverage gate em `vitest.config.mts`.
