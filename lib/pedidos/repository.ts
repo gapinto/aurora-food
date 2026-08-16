@@ -45,6 +45,9 @@ export interface PedidosRepository {
   // Usado pra autorização (exigirAcessoALoja) antes de aceitar uma mudança
   // de status — ver app/api/pedidos/[pedidoId]/status/route.ts.
   buscarLojaDoPedido(pedidoId: string): Promise<string | null>;
+  // Usado só pela rota dev de simulação de pagamento (modo mock do Asaas) —
+  // ver app/api/dev/simular-pagamento-pix/route.ts.
+  buscarChargeIdDoPedido(pedidoId: string): Promise<string | null>;
   buscarStatusAtual(pedidoId: string): Promise<StatusPedido | null>;
   atualizarStatus(pedidoId: string, status: StatusPedido): Promise<void>;
   confirmarPagamentoPix(chargeId: string): Promise<boolean>;

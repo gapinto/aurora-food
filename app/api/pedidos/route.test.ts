@@ -10,7 +10,7 @@ vi.mock("@/lib/pedidos/supabase-repository", () => ({
   },
 }));
 
-vi.mock("@/lib/asaas/client", () => ({
+vi.mock("@/lib/asaas/provider", () => ({
   asaasPagamentoProvider: {
     criarCobrancaPix: vi.fn(),
   },

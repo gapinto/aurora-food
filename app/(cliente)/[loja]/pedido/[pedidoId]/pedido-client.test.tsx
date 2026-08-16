@@ -1,4 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Pedido } from "@/lib/types/database";
@@ -20,6 +21,14 @@ vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({ channel, removeChannel }),
 }));
 
+const asaasMockAtivo = vi.fn(() => false);
+vi.mock("@/lib/asaas/provider", () => ({
+  asaasMockAtivo: () => asaasMockAtivo(),
+}));
+
+const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true })));
+vi.stubGlobal("fetch", fetchMock);
+
 function pedido(overrides: Partial<Pedido>): Pedido {
   return {
     id: "pedido-1",
@@ -38,6 +47,8 @@ function pedido(overrides: Partial<Pedido>): Pedido {
 describe("PedidoClient", () => {
   beforeEach(() => {
     callbackCapturado = null;
+    asaasMockAtivo.mockReturnValue(false);
+    fetchMock.mockClear();
   });
 
   it("mostra 'aguardando confirmação' enquanto o status é de pagamento pendente", () => {
@@ -76,5 +87,39 @@ describe("PedidoClient", () => {
     expect(channel).toHaveBeenCalledWith("pedido-pedido-42");
     unmount();
     expect(removeChannel).toHaveBeenCalled();
+  });
+
+  it("não mostra o botão de simular pagamento fora do modo mock", () => {
+    asaasMockAtivo.mockReturnValue(false);
+    render(<PedidoClient pedidoInicial={pedido({ status: "aguardando_pagamento_pix" })} />);
+
+    expect(screen.queryByRole("button", { name: /Simular pagamento/ })).not.toBeInTheDocument();
+  });
+
+  it("não mostra o botão de simular pagamento pra pedido 'pagar no caixa', mesmo em modo mock (é só do fluxo Pix)", () => {
+    asaasMockAtivo.mockReturnValue(true);
+    render(
+      <PedidoClient
+        pedidoInicial={pedido({ status: "aguardando_pagamento_caixa", forma_pagamento: "caixa" })}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /Simular pagamento/ })).not.toBeInTheDocument();
+  });
+
+  it("em modo mock, clicar em 'simular pagamento' chama a rota dev com o id do pedido", async () => {
+    asaasMockAtivo.mockReturnValue(true);
+    const user = userEvent.setup();
+    render(<PedidoClient pedidoInicial={pedido({ id: "pedido-7", status: "aguardando_pagamento_pix" })} />);
+
+    await user.click(screen.getByRole("button", { name: /Simular pagamento/ }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/dev/simular-pagamento-pix",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ pedidoId: "pedido-7" }),
+      }),
+    );
   });
 });

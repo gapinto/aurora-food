@@ -78,6 +78,16 @@ export type LojaUsuario = {
   criado_em: string;
 };
 
+// Cadastro de interesse na landing — playbook Nubank de early access por
+// convite (ver lib/lista-espera/).
+export type ListaEspera = {
+  id: string;
+  nome: string;
+  email: string;
+  nome_restaurante: string | null;
+  criado_em: string;
+};
+
 // Shape mínimo exigido pelo generic `Database` do @supabase/postgrest-js —
 // quando gerado via `supabase gen types typescript`, esses campos vêm
 // preenchidos automaticamente a partir do schema real.
@@ -103,6 +113,11 @@ export type Database = {
         Row: LojaUsuario;
         Insert: Partial<LojaUsuario>;
         Update: Partial<LojaUsuario>;
+      } & SemRelacionamentos;
+      lista_de_espera: {
+        Row: ListaEspera;
+        Insert: Partial<ListaEspera>;
+        Update: Partial<ListaEspera>;
       } & SemRelacionamentos;
     };
     Views: Record<string, never>;

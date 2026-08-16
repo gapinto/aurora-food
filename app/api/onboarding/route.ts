@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { asaasPagamentoProvider } from "@/lib/asaas/client";
+import { asaasPagamentoProvider } from "@/lib/asaas/provider";
 import { iniciarOnboarding, type IniciarOnboardingInput } from "@/lib/lojas/onboarding";
 import { supabaseLojasRepository } from "@/lib/lojas/supabase-repository";
 

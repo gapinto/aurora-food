@@ -61,9 +61,9 @@ function criarCobrancaPix(input: CriarCobrancaPixInput): Promise<CriarCobrancaPi
   });
 }
 
-export const asaasPagamentoProvider: PagamentoProvider = {
+// Implementação real via HTTP — nunca importada direto por rotas de API,
+// só por lib/asaas/provider.ts (que decide entre esta e a mock).
+export const asaasHttpProvider: PagamentoProvider = {
   criarSubconta,
   criarCobrancaPix,
 };
-
-export type { PagamentoProvider } from "./types";

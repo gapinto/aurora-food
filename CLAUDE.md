@@ -67,6 +67,17 @@ dependências) ficam em `docs/diagramas/` — YAML como fonte de verdade,
 - **Nunca implementar** fluxo que centraliza dinheiro numa conta única da
   Aurora para repasse manual (ver decisões descartadas).
 
+**Modo mock (dev local):** `NEXT_PUBLIC_ASAAS_MOCK=true` troca
+`asaasHttpProvider` por `asaasMockProvider` (`lib/asaas/mock-client.ts`) —
+formatos de campo inspirados na doc real do Asaas, sem chamar rede. Como
+não existe pagador de verdade nesse modo, a tela de acompanhamento do
+pedido (`pedido-client.tsx`) mostra um botão "Simular pagamento Pix"
+quando `status === aguardando_pagamento_pix`, que chama
+`app/api/dev/simular-pagamento-pix/route.ts` — essa rota só existe com o
+mock ligado (404 fora dele) e reusa o mesmo caso de uso do webhook real
+(`confirmarPagamentoPix`), não um UPDATE direto. Nunca deixar
+`NEXT_PUBLIC_ASAAS_MOCK=true` em produção — ver `lib/asaas/provider.ts`.
+
 ## Onboarding (AI-first)
 
 Ordem de implementação das fontes de importação de cardápio:
@@ -78,6 +89,24 @@ Ordem de implementação das fontes de importação de cardápio:
 **Preço, NCM e split são sempre confirmados por um humano** antes de
 aplicados — nenhuma rota deve gravar esses campos direto no cardápio
 publicado sem esse passo.
+
+## Lista de espera (early access)
+
+Acesso à plataforma é por convite, propositalmente — playbook Nubank de
+criar fila/exclusividade em vez de self-service aberto. A landing (`/`)
+tem um formulário (`app/lista-espera-form.tsx` → `POST /api/lista-espera`
+→ `lib/lista-espera/`) que só pede nome, e-mail e nome do restaurante
+(opcional, pra não derrubar conversão) e grava em `lista_de_espera`
+(`supabase/migrations/0003_lista_de_espera.sql`). E-mail duplicado é
+tratado como sucesso idempotente ("você já está na lista"), não erro.
+
+**Convite ainda é 100% manual** — não existe fluxo automatizado que
+transforma uma linha de `lista_de_espera` em loja + usuário funcionando.
+Quando decidir convidar alguém: criar a `loja`, criar o usuário no
+Supabase Auth (dashboard — não há tela de signup, de propósito, ver seção
+de engenharia) e linkar em `loja_usuarios`, mesmo processo descrito no
+README pro ambiente de teste. Automatizar isso é trabalho futuro, não
+escopo desta feature.
 
 ## Agente de IA do cardápio
 
@@ -306,44 +335,50 @@ definitivo ao implementar cobrança.
   pronto. Corrigido: `app/(painel)/cozinha/[loja]/page.tsx` busca também
   `pronto`, `fila-cozinha.tsx` ganhou o botão "Marcar retirado".
 
-- **Ainda falta, pra jornadas 100% fechadas localmente:**
-  - **Sem tela de cadastro (signup)** — só login
-    (`app/(painel)/login/login-form.tsx` usa só `signInWithPassword`). O
-    primeiro usuário de cada loja precisa ser criado no dashboard do
-    Supabase (Authentication → Users → Add user) e linkado manualmente em
-    `loja_usuarios` — ver `supabase/seed.sql` e o passo a passo no README.
-  - **Fluxo de convite de operador** — mesma raiz do item acima, mas como
-    feature própria (dono convida operador de caixa/cozinha), não só "criar
-    o primeiro usuário".
-  - **Pix online precisa de túnel público** (ngrok ou similar) apontando
-    pra `/api/webhooks/asaas` pra testar localmente — Asaas sandbox não
-    alcança `localhost`. A jornada "pagar no caixa" não tem essa
-    dependência.
+- **Decisão confirmada — sem self-service signup no painel, de propósito:**
+  `app/(painel)/login/login-form.tsx` usa só `signInWithPassword` — não é
+  um gap a fechar, é o modelo de acesso escolhido (playbook Nubank, ver
+  seção "Lista de espera" acima). O "cadastro" público é a lista de espera
+  na landing, não uma conta de painel self-service. O primeiro usuário de
+  cada loja continua criado manualmente no dashboard do Supabase
+  (Authentication → Users → Add user) e linkado em `loja_usuarios` — ver
+  `supabase/seed.sql` e o passo a passo no README.
+  - **Fluxo de convite automatizado** (lista de espera → loja + usuário
+    funcionando sem passo manual) ainda não existe — feature própria, fora
+    do escopo do formulário em si.
+  - **Pix online com Asaas de verdade** ainda precisa de túnel público
+    (ngrok ou similar) apontando pra `/api/webhooks/asaas` — Asaas sandbox
+    não alcança `localhost`. Com `NEXT_PUBLIC_ASAAS_MOCK=true` (ver seção
+    "Pagamento (Asaas)" acima) isso não é mais necessário pra testar a
+    jornada localmente, só pra validar contra o Asaas real antes de ir pra
+    produção.
 
 ## Estado atual do harness
 
 Scaffold inicial: Next.js 16 (App Router) + Tailwind 4 + TypeScript,
-integrações Supabase/Asaas como stubs tipados, schema completo em
-migrations (incluindo `loja_usuarios` pra autorização) + `seed.sql` com uma
-loja de teste e cardápio, autenticação de painel via Supabase Auth, todas
-as telas da Fase 1 com o ciclo do pedido fechado de ponta a ponta (pago →
-preparando → pronto → retirado) — dados de exemplo/mocks só entram quando
-não há projeto Supabase real conectado.
+integrações Supabase/Asaas (real + mock) como stubs tipados, schema
+completo em migrations (`loja_usuarios` pra autorização,
+`lista_de_espera` pro early access) + `seed.sql` com uma loja de teste,
+cardápio e wallet Asaas mock, autenticação de painel via Supabase Auth,
+todas as telas da Fase 1 com o ciclo do pedido fechado de ponta a ponta
+(pago → preparando → pronto → retirado) — dados de exemplo/mocks só
+entram quando não há projeto Supabase real conectado. Com
+`NEXT_PUBLIC_ASAAS_MOCK=true`, a jornada Pix online também roda 100%
+local, sem conta Asaas nem túnel.
 
-Testes: Vitest + Testing Library, ~95 testes cobrindo os casos de uso de
-pedidos/onboarding/autorização (via fakes das interfaces), os cálculos de
-carrinho, a máquina de estados de status, os componentes de
-cardápio/painéis/login/acompanhamento de pedido, e três adapters HTTP
-(`app/api/pedidos/route.ts`, `.../status/route.ts`,
-`.../webhooks/asaas/route.ts`). Rodar com `npm test` ou
+Testes: Vitest + Testing Library, ~120 testes cobrindo os casos de uso de
+pedidos/onboarding/autorização/lista de espera (via fakes das
+interfaces), os cálculos de carrinho, a máquina de estados de status, os
+componentes de cardápio/painéis/login/lista de espera/acompanhamento de
+pedido, e os adapters HTTP mais centrais. Rodar com `npm test` ou
 `npm run test:coverage`. Ver seção "Práticas de engenharia" acima antes de
 adicionar código novo.
 
 Próximos passos naturais: provisionar o projeto Supabase real e seguir o
 passo a passo do README ("Rodando com todas as jornadas funcionando") —
 migrations, seed, primeiro usuário, `.env.local`; criar conta Asaas
-sandbox pra testar Pix online (com túnel); desenhar o fluxo de convite de
-operador (hoje `loja_usuarios` só é populável manualmente); e migrar as
-rotas ainda sem caso de uso extraído (agente, import-cardapio, webhook
-Asaas) pro mesmo padrão de interface — ver a lista de exclusões do
-coverage gate em `vitest.config.mts`.
+sandbox pra validar contra a API real antes de produção (com túnel);
+desenhar o fluxo de convite automatizado (lista de espera → loja +
+usuário funcionando, hoje é manual); e migrar as rotas ainda sem caso de
+uso extraído (agente, import-cardapio) pro mesmo padrão de interface —
+ver a lista de exclusões do coverage gate em `vitest.config.mts`.

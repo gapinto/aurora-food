@@ -12,13 +12,18 @@
 -- Com isso: /11111111-1111-1111-1111-111111111111/menu monta o pedido,
 -- /login entra no painel, /cozinha e /caixa dessa mesma loja funcionam.
 
-insert into lojas (id, nome, cnpj, regime_fiscal, comissao_percentual)
+-- asaas_wallet_id fica com um valor claramente marcado como mock — só faz
+-- sentido junto de NEXT_PUBLIC_ASAAS_MOCK=true (ver lib/asaas/provider.ts).
+-- Sem isso, criarPedido não gera cobrança Pix (loja sem subconta
+-- configurada é tratado como "onboarding incompleto", não erro).
+insert into lojas (id, nome, cnpj, regime_fiscal, comissao_percentual, asaas_wallet_id)
 values (
   '11111111-1111-1111-1111-111111111111',
   'Aurora Burger (loja de teste)',
   '00.000.000/0001-00',
   'simples_nacional',
-  1.5
+  1.5,
+  'mock-wallet-loja-teste'
 )
 on conflict (id) do nothing;
 

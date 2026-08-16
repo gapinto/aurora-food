@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { asaasPagamentoProvider } from "@/lib/asaas/client";
+import { asaasPagamentoProvider } from "@/lib/asaas/provider";
 import { criarPedido, type CriarPedidoInput } from "@/lib/pedidos/criar-pedido";
 import { supabasePedidosRepository } from "@/lib/pedidos/supabase-repository";
 
