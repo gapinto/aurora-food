@@ -262,7 +262,7 @@ definitivo ao implementar cobrança.
     àquela loja, mostra "você não tem acesso" em vez de redirecionar de
     novo pro login.
   - `app/(painel)/login/` (Supabase Auth email/senha) e botão de logout no
-    header dos painéis. `middleware.ts` refresca o token de sessão a cada
+    header dos painéis. `proxy.ts` (convenção Next 16 — antigo middleware.ts) refresca o token de sessão a cada
     request (padrão `@supabase/ssr` — sem isso a sessão expira em silêncio
     no meio do uso).
   - **Fora de escopo, de propósito:** cadastro de operador/dono

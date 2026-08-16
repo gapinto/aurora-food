@@ -49,7 +49,7 @@ sempre caso de uso + interface + teste com fake, TDD.
 - `app/(painel)/{cozinha,caixa}/[loja]/**` — painéis internos em tempo real.
 - `app/api/**` — adapters HTTP finos: parseiam a request, injetam as implementações reais e chamam o caso de uso correspondente.
 - `lib/pedidos/`, `lib/lojas/` — casos de uso (lógica de negócio pura) + interfaces de repositório + implementações Supabase.
-- `lib/auth/` — autorização de painel via Supabase Auth (interface `AutorizacaoRepository` + caso de uso `exigirAcessoALoja`); `middleware.ts` refresca a sessão.
+- `lib/auth/` — autorização de painel via Supabase Auth (interface `AutorizacaoRepository` + caso de uso `exigirAcessoALoja`); `proxy.ts` (convenção Next 16 — antigo middleware.ts) refresca a sessão.
 - `lib/asaas/` — interface `PagamentoProvider` + implementação real via fetch.
 - `lib/carrinho/`, `lib/supabase/`, `lib/agente/` — cálculos compartilhados e outras integrações.
 - `test/fakes/` — implementações em memória das interfaces, usadas nos testes dos casos de uso.

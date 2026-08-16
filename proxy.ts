@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // que os Server Components leiam os cookies — sem isso, a sessão expira
 // silenciosamente e exigirAcessoALoja (lib/auth/) passa a ver o usuário
 // como não-autenticado no meio de uma sessão que deveria continuar válida.
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
