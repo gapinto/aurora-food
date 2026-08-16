@@ -54,6 +54,27 @@ describe("FilaCozinha", () => {
     expect(screen.getByRole("button", { name: "Marcar pronto" })).toBeInTheDocument();
   });
 
+  it("pedido 'pronto' mostra botão 'Marcar retirado' — fecha o ciclo que antes travava em 'pronto'", () => {
+    render(<FilaCozinha lojaId="loja-1" pedidosIniciais={[pedido({ status: "pronto" })]} />);
+    expect(screen.getByText("Pronto para retirada")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Marcar retirado" })).toBeInTheDocument();
+  });
+
+  it("marcar retirado faz PATCH pra 'retirado'", async () => {
+    const user = userEvent.setup();
+    render(<FilaCozinha lojaId="loja-1" pedidosIniciais={[pedido({ id: "pedido-3", status: "pronto" })]} />);
+
+    await user.click(screen.getByRole("button", { name: "Marcar retirado" }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/pedidos/pedido-3/status",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ status: "retirado" }),
+      }),
+    );
+  });
+
   it("clicar em avançar faz PATCH pro próximo status da máquina de estados", async () => {
     const user = userEvent.setup();
     render(<FilaCozinha lojaId="loja-1" pedidosIniciais={[pedido({ id: "pedido-9", status: "pago" })]} />);

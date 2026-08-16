@@ -11,7 +11,7 @@ async function buscarPedidos(lojaId: string) {
     .from("pedidos")
     .select("*")
     .eq("loja_id", lojaId)
-    .in("status", ["pago", "preparando"])
+    .in("status", ["pago", "preparando", "pronto"])
     .order("criado_em");
   return data ?? [];
 }

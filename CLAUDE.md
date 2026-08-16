@@ -299,14 +299,36 @@ definitivo ao implementar cobrança.
     de eventos sensíveis (confirmação de pagamento, mudança de status,
     onboarding) — avaliar antes de produção.
 
+- **Corrigido — ciclo do pedido travava em "pronto":** revisando as
+  jornadas de ponta a ponta (não é achado de segurança, é gap funcional),
+  nenhum painel buscava pedidos com status `pronto` nem tinha ação pra
+  `pronto → retirado` — o pedido nunca saía da tela da cozinha depois de
+  pronto. Corrigido: `app/(painel)/cozinha/[loja]/page.tsx` busca também
+  `pronto`, `fila-cozinha.tsx` ganhou o botão "Marcar retirado".
+
+- **Ainda falta, pra jornadas 100% fechadas localmente:**
+  - **Sem tela de cadastro (signup)** — só login
+    (`app/(painel)/login/login-form.tsx` usa só `signInWithPassword`). O
+    primeiro usuário de cada loja precisa ser criado no dashboard do
+    Supabase (Authentication → Users → Add user) e linkado manualmente em
+    `loja_usuarios` — ver `supabase/seed.sql` e o passo a passo no README.
+  - **Fluxo de convite de operador** — mesma raiz do item acima, mas como
+    feature própria (dono convida operador de caixa/cozinha), não só "criar
+    o primeiro usuário".
+  - **Pix online precisa de túnel público** (ngrok ou similar) apontando
+    pra `/api/webhooks/asaas` pra testar localmente — Asaas sandbox não
+    alcança `localhost`. A jornada "pagar no caixa" não tem essa
+    dependência.
+
 ## Estado atual do harness
 
 Scaffold inicial: Next.js 16 (App Router) + Tailwind 4 + TypeScript,
 integrações Supabase/Asaas como stubs tipados, schema completo em
-migrations (incluindo `loja_usuarios` pra autorização), autenticação de
-painel via Supabase Auth, todas as telas da Fase 1 com estrutura e UX
-corretas mas dados de exemplo/mocks onde não há projeto Supabase real
-conectado ainda.
+migrations (incluindo `loja_usuarios` pra autorização) + `seed.sql` com uma
+loja de teste e cardápio, autenticação de painel via Supabase Auth, todas
+as telas da Fase 1 com o ciclo do pedido fechado de ponta a ponta (pago →
+preparando → pronto → retirado) — dados de exemplo/mocks só entram quando
+não há projeto Supabase real conectado.
 
 Testes: Vitest + Testing Library, ~95 testes cobrindo os casos de uso de
 pedidos/onboarding/autorização (via fakes das interfaces), os cálculos de
@@ -317,12 +339,11 @@ cardápio/painéis/login/acompanhamento de pedido, e três adapters HTTP
 `npm run test:coverage`. Ver seção "Práticas de engenharia" acima antes de
 adicionar código novo.
 
-Próximos passos naturais: provisionar o projeto Supabase real e rodar as
-migrations, habilitar email/senha no Supabase Auth e cadastrar o primeiro
-usuário de teste em `loja_usuarios`, criar conta Asaas sandbox e preencher
-`.env.local` (a partir de `.env.example`), substituir os dados de exemplo
-do cardápio por dados reais de uma loja de teste, desenhar o fluxo de
-convite de operador (hoje `loja_usuarios` só é populável manualmente), e
-migrar as rotas ainda sem caso de uso extraído (agente, import-cardapio,
-webhook Asaas) pro mesmo padrão de interface — ver a lista de exclusões do
+Próximos passos naturais: provisionar o projeto Supabase real e seguir o
+passo a passo do README ("Rodando com todas as jornadas funcionando") —
+migrations, seed, primeiro usuário, `.env.local`; criar conta Asaas
+sandbox pra testar Pix online (com túnel); desenhar o fluxo de convite de
+operador (hoje `loja_usuarios` só é populável manualmente); e migrar as
+rotas ainda sem caso de uso extraído (agente, import-cardapio, webhook
+Asaas) pro mesmo padrão de interface — ver a lista de exclusões do
 coverage gate em `vitest.config.mts`.

@@ -5,14 +5,28 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Pedido, StatusPedido } from "@/lib/types/database";
 
+// Fila da cozinha cobre o ciclo inteiro do pedido pago até a entrega —
+// sem isso, "pronto" era um beco sem saída: nenhum painel buscava esses
+// pedidos nem tinha ação pra fechar o ciclo (achado ao revisar as jornadas
+// de ponta a ponta, ver CLAUDE.md/Backlog).
+const STATUS_RELEVANTES: StatusPedido[] = ["pago", "preparando", "pronto"];
+
 const PROXIMO_STATUS: Partial<Record<StatusPedido, StatusPedido>> = {
   pago: "preparando",
   preparando: "pronto",
+  pronto: "retirado",
 };
 
 const RUBRICA_BOTAO: Partial<Record<StatusPedido, string>> = {
   pago: "Iniciar preparo",
   preparando: "Marcar pronto",
+  pronto: "Marcar retirado",
+};
+
+const STATUS_ROTULO: Partial<Record<StatusPedido, string>> = {
+  pago: "Aguardando início",
+  preparando: "Em preparo",
+  pronto: "Pronto para retirada",
 };
 
 export function FilaCozinha({ lojaId, pedidosIniciais }: { lojaId: string; pedidosIniciais: Pedido[] }) {
@@ -30,7 +44,7 @@ export function FilaCozinha({ lojaId, pedidosIniciais }: { lojaId: string; pedid
           const pedidoAtualizado = payload.new as Pedido;
           setPedidos((atual) => {
             const semEsteId = atual.filter((pedido) => pedido.id !== pedidoAtualizado.id);
-            const relevante = pedidoAtualizado.status === "pago" || pedidoAtualizado.status === "preparando";
+            const relevante = STATUS_RELEVANTES.includes(pedidoAtualizado.status);
             return relevante ? [...semEsteId, pedidoAtualizado] : semEsteId;
           });
         },
@@ -57,9 +71,7 @@ export function FilaCozinha({ lojaId, pedidosIniciais }: { lojaId: string; pedid
       {pedidos.map((pedido) => (
         <article key={pedido.id} className="rounded-xl border border-white/10 p-4">
           <p className="text-3xl font-bold">{pedido.senha}</p>
-          <p className="mb-3 text-sm text-neutral-400">
-            {pedido.status === "pago" ? "Aguardando início" : "Em preparo"}
-          </p>
+          <p className="mb-3 text-sm text-neutral-400">{STATUS_ROTULO[pedido.status]}</p>
           {PROXIMO_STATUS[pedido.status] && (
             <button
               type="button"
