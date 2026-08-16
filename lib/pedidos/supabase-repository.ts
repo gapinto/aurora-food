@@ -70,6 +70,12 @@ export const supabasePedidosRepository: PedidosRepository = {
     await supabase.from("pedidos").update({ asaas_charge_id: chargeId }).eq("id", pedidoId);
   },
 
+  async buscarLojaDoPedido(pedidoId: string): Promise<string | null> {
+    const supabase = createServiceRoleClient();
+    const { data } = await supabase.from("pedidos").select("loja_id").eq("id", pedidoId).single();
+    return data?.loja_id ?? null;
+  },
+
   async buscarStatusAtual(pedidoId: string) {
     const supabase = createServiceRoleClient();
     const { data } = await supabase.from("pedidos").select("status").eq("id", pedidoId).single();

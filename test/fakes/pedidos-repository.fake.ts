@@ -58,6 +58,10 @@ export function criarPedidosRepositoryFake(options?: {
       if (pedido) pedido.asaasChargeId = chargeId;
     },
 
+    async buscarLojaDoPedido(pedidoId: string): Promise<string | null> {
+      return pedidos.get(pedidoId)?.lojaId ?? null;
+    },
+
     async buscarStatusAtual(pedidoId: string): Promise<StatusPedido | null> {
       return pedidos.get(pedidoId)?.status ?? null;
     },

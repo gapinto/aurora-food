@@ -1,6 +1,8 @@
+import { exigirAcessoAoPainel } from "@/lib/auth/proteger-pagina-painel";
 import { supabaseConfigurado } from "@/lib/supabase/configured";
 import { createClient } from "@/lib/supabase/server";
 
+import { LogoutButton } from "../../logout-button";
 import { FilaCozinha } from "./fila-cozinha";
 
 async function buscarPedidos(lojaId: string) {
@@ -20,14 +22,25 @@ export default async function CozinhaPage({
   params: Promise<{ loja: string }>;
 }) {
   const { loja } = await params;
+
+  // Sem Supabase real conectado ainda, não há sessão possível — cai no
+  // modo demo (lista vazia) em vez de exigir login que não pode funcionar.
+  if (supabaseConfigurado()) {
+    const protecao = await exigirAcessoAoPainel(loja, `/cozinha/${loja}`);
+    if (!protecao.autorizado) {
+      return <p className="p-4 text-neutral-400">Você não tem acesso a esta loja.</p>;
+    }
+  }
+
   const data = supabaseConfigurado() ? await buscarPedidos(loja) : [];
 
   return (
     <>
-      <header className="border-b border-white/10 p-4">
+      <header className="flex items-center justify-between border-b border-white/10 p-4">
         <h1 className="text-xl font-semibold">Painel da cozinha</h1>
+        {supabaseConfigurado() && <LogoutButton />}
       </header>
-      <FilaCozinha lojaId={loja} pedidosIniciais={data ?? []} />
+      <FilaCozinha lojaId={loja} pedidosIniciais={data} />
     </>
   );
 }

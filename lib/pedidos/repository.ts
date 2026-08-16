@@ -42,6 +42,9 @@ export interface PedidosRepository {
   buscarItensDisponiveis(lojaId: string, itemIds: string[]): Promise<ItemDisponivel[]>;
   buscarLojaParaPagamento(lojaId: string): Promise<LojaResumoPagamento | null>;
   atualizarChargeId(pedidoId: string, chargeId: string): Promise<void>;
+  // Usado pra autorização (exigirAcessoALoja) antes de aceitar uma mudança
+  // de status — ver app/api/pedidos/[pedidoId]/status/route.ts.
+  buscarLojaDoPedido(pedidoId: string): Promise<string | null>;
   buscarStatusAtual(pedidoId: string): Promise<StatusPedido | null>;
   atualizarStatus(pedidoId: string, status: StatusPedido): Promise<void>;
   confirmarPagamentoPix(chargeId: string): Promise<boolean>;

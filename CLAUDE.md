@@ -241,24 +241,44 @@ definitivo ao implementar cobrança.
     comparação em tempo constante (`timingSafeEqual`). Teste em
     `route.test.ts`.
 
-  **Ainda aberto — o mais crítico do que sobra:**
-  - **A01/A07 Broken Access Control / Authentication:** `PATCH
-    /api/pedidos/[pedidoId]/status` e as rotas de painel
-    (`app/(painel)/cozinha`, `app/(painel)/caixa`) não têm nenhuma
-    autenticação. Isso é explorável de forma direta: o `pedidoId` fica na
-    URL que o próprio cliente recebe depois do checkout
-    (`/[loja]/pedido/[pedidoId]`), então um cliente mal-intencionado pode
-    chamar `PATCH` nesse endpoint direto do DevTools e avançar o próprio
-    pedido pra `pago` (inclusive o de "pagar no caixa", sem pagar nada) —
-    a máquina de estados em `lib/pedidos/status.ts` impede pular etapa, mas
-    não impede quem aciona. Corrigir exige decidir o mecanismo de auth pro
-    dono da loja / operador de caixa-cozinha (Supabase Auth é o candidato
-    natural, já que o resto do stack já é Supabase) — é uma decisão de
-    arquitetura, não um bug pontual, por isso não foi resolvida junto dos
-    dois itens acima. Falta também RLS de verdade em `insert`/`update` nas
-    migrations (hoje só o `select` de itens/pedidos é público; escrita
-    depende inteiramente da service role usada pelas rotas, então travar a
-    rota é obrigatório, RLS sozinho não resolve).
+  **Também corrigido — A01/A07 Broken Access Control / Authentication:**
+  `PATCH /api/pedidos/[pedidoId]/status` e as rotas de painel
+  (`app/(painel)/cozinha`, `app/(painel)/caixa`) não tinham nenhuma
+  autenticação — um cliente mal-intencionado podia chamar `PATCH` direto do
+  DevTools (o `pedidoId` fica na própria URL que ele recebe após o
+  checkout) e avançar o próprio pedido "pagar no caixa" pra `pago` sem
+  pagar nada. Resolvido com Supabase Auth:
+  - `supabase/migrations/0002_loja_usuarios.sql` — tabela de associação
+    usuário↔loja (RLS: cada usuário só lê as próprias associações).
+  - `lib/auth/repository.ts` (interface `AutorizacaoRepository`) +
+    `supabase-repository.ts` (implementação via cookies de sessão) +
+    `exigir-acesso-loja.ts` (caso de uso puro, testado com fake — mesmo
+    padrão de `lib/pedidos/`).
+  - `PATCH /api/pedidos/[pedidoId]/status` busca a loja do pedido e chama
+    `exigirAcessoALoja` antes de aplicar qualquer transição — 401 sem
+    sessão, 403 se a sessão não pertence àquela loja.
+  - Páginas de painel usam `lib/auth/proteger-pagina-painel.ts`: sem sessão
+    manda pro `/login` (com `next` de volta); com sessão mas sem acesso
+    àquela loja, mostra "você não tem acesso" em vez de redirecionar de
+    novo pro login.
+  - `app/(painel)/login/` (Supabase Auth email/senha) e botão de logout no
+    header dos painéis. `middleware.ts` refresca o token de sessão a cada
+    request (padrão `@supabase/ssr` — sem isso a sessão expira em silêncio
+    no meio do uso).
+  - **Fora de escopo, de propósito:** cadastro de operador/dono
+    (`loja_usuarios`) ainda não tem fluxo de convite — hoje só dá pra
+    inserir linha via service role/dashboard do Supabase manualmente. Isso
+    entra junto do onboarding de equipe, uma feature própria, não parte
+    deste fix de segurança pontual. RLS de `insert`/`update` em
+    `itens`/`pedidos` continua dependendo inteiramente da service role
+    usada pelas rotas (a autorização acontece na rota, não na policy) —
+    aceitável enquanto todo acesso de escrita passa por essas rotas, mas
+    vale revisar se algum dia houver acesso direto ao Supabase fora delas.
+  - **Modo demo sem Supabase configurado:** quando `NEXT_PUBLIC_SUPABASE_URL`
+    não está setada, painéis pulam a checagem de auth (não há sessão
+    possível de qualquer forma) e caem no fallback de lista vazia já
+    existente — só pra navegar a UI localmente sem projeto Supabase real.
+
   - **A02 Cryptographic Failures:** conferir que `SUPABASE_SERVICE_ROLE_KEY`,
     `ASAAS_API_KEY` e o certificado A1 do lojista nunca chegam ao client
     (hoje só usados em `lib/*/supabase-repository.ts` e `lib/asaas/client.ts`,
@@ -283,20 +303,26 @@ definitivo ao implementar cobrança.
 
 Scaffold inicial: Next.js 16 (App Router) + Tailwind 4 + TypeScript,
 integrações Supabase/Asaas como stubs tipados, schema completo em
-migrations, todas as telas da Fase 1 com estrutura e UX corretas mas dados
-de exemplo/mocks onde não há projeto Supabase real conectado ainda.
+migrations (incluindo `loja_usuarios` pra autorização), autenticação de
+painel via Supabase Auth, todas as telas da Fase 1 com estrutura e UX
+corretas mas dados de exemplo/mocks onde não há projeto Supabase real
+conectado ainda.
 
-Testes: Vitest + Testing Library, ~80 testes cobrindo os casos de uso de
-pedidos/onboarding (via fakes das interfaces), os cálculos de carrinho, a
-máquina de estados de status, os componentes de cardápio/painéis/
-acompanhamento de pedido, e três adapters HTTP (`app/api/pedidos/route.ts`,
-`.../status/route.ts`, `.../webhooks/asaas/route.ts`). Rodar com `npm test`
-ou `npm run test:coverage`. Ver seção "Práticas de engenharia" acima antes
-de adicionar código novo.
+Testes: Vitest + Testing Library, ~95 testes cobrindo os casos de uso de
+pedidos/onboarding/autorização (via fakes das interfaces), os cálculos de
+carrinho, a máquina de estados de status, os componentes de
+cardápio/painéis/login/acompanhamento de pedido, e três adapters HTTP
+(`app/api/pedidos/route.ts`, `.../status/route.ts`,
+`.../webhooks/asaas/route.ts`). Rodar com `npm test` ou
+`npm run test:coverage`. Ver seção "Práticas de engenharia" acima antes de
+adicionar código novo.
 
-Próximos passos naturais: provisionar o projeto Supabase real e rodar a
-migration, criar conta Asaas sandbox e preencher `.env.local` (a partir de
-`.env.example`), substituir os dados de exemplo do cardápio por dados reais
-de uma loja de teste, e migrar as rotas ainda sem caso de uso extraído
-(agente, import-cardapio, webhook Asaas) pro mesmo padrão de interface —
-ver a lista de exclusões do coverage gate em `vitest.config.mts`.
+Próximos passos naturais: provisionar o projeto Supabase real e rodar as
+migrations, habilitar email/senha no Supabase Auth e cadastrar o primeiro
+usuário de teste em `loja_usuarios`, criar conta Asaas sandbox e preencher
+`.env.local` (a partir de `.env.example`), substituir os dados de exemplo
+do cardápio por dados reais de uma loja de teste, desenhar o fluxo de
+convite de operador (hoje `loja_usuarios` só é populável manualmente), e
+migrar as rotas ainda sem caso de uso extraído (agente, import-cardapio,
+webhook Asaas) pro mesmo padrão de interface — ver a lista de exclusões do
+coverage gate em `vitest.config.mts`.

@@ -70,6 +70,14 @@ export type EventoFunil = {
   criado_em: string;
 };
 
+// Associação usuário (Supabase Auth) ↔ loja — base da autorização do
+// painel e da rota de status de pedido (ver lib/auth/).
+export type LojaUsuario = {
+  loja_id: string;
+  user_id: string;
+  criado_em: string;
+};
+
 // Shape mínimo exigido pelo generic `Database` do @supabase/postgrest-js —
 // quando gerado via `supabase gen types typescript`, esses campos vêm
 // preenchidos automaticamente a partir do schema real.
@@ -90,6 +98,11 @@ export type Database = {
         Row: EventoFunil;
         Insert: Partial<EventoFunil>;
         Update: Partial<EventoFunil>;
+      } & SemRelacionamentos;
+      loja_usuarios: {
+        Row: LojaUsuario;
+        Insert: Partial<LojaUsuario>;
+        Update: Partial<LojaUsuario>;
       } & SemRelacionamentos;
     };
     Views: Record<string, never>;
